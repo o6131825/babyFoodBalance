@@ -11,9 +11,8 @@ import {
   Sun,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import type { ThemeMode } from '@/data/types'
-import { clearAccessToken } from '@/features/auth/google'
 import { useInstallPrompt } from '@/features/pwa/useInstallPrompt'
 import { useAppStore } from '@/features/store/appStore'
 import { pullFromDrive } from '@/features/sync/engine'
@@ -42,6 +41,7 @@ function categoriesLabel(count: number) {
 }
 
 export function SettingsScreen() {
+  const navigate = useNavigate()
   const state = useAppStore((s) => s.state)
   const user = useAppStore((s) => s.user)
   const theme = useAppStore((s) => s.theme)
@@ -442,9 +442,9 @@ export function SettingsScreen() {
         confirmLabel="Выйти"
         onClose={() => setLogoutOpen(false)}
         onConfirm={() => {
-          clearAccessToken()
           setUser(null)
           setLogoutOpen(false)
+          navigate('/login', { replace: true })
         }}
       />
     </div>

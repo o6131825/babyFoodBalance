@@ -8,7 +8,12 @@ import type {
   Unit,
   User,
 } from '@/data/types'
-import { persistUser, readStoredUser } from '@/features/auth/google'
+import {
+  clearAccessToken,
+  enableAuthSession,
+  persistUser,
+  readStoredUser,
+} from '@/features/auth/google'
 import { uid } from '@/features/calculator'
 import { loadState, saveState } from '@/features/sync/db'
 import { persistFileId } from '@/features/sync/drive'
@@ -141,6 +146,11 @@ export const useAppStore = create<AppStore>((set, get) => {
 
     setUser: (user) => {
       const prev = get().user
+      if (!user) {
+        clearAccessToken()
+      } else if (!user.local) {
+        enableAuthSession()
+      }
       if (!user || prev?.email !== user.email) {
         persistFileId(null)
         resetDriveCache()

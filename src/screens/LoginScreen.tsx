@@ -1,47 +1,53 @@
-import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
   consumeGoogleRedirect,
   googleConfigured,
   hasOAuthCallback,
   startGoogleSignIn,
-} from '@/features/auth/google'
-import { useAppStore } from '@/features/store/appStore'
-import { Button } from '@/shared/ui/Button'
+} from "@/features/auth/google";
+import { useAppStore } from "@/features/store/appStore";
+import { Button } from "@/shared/ui/Button";
 
 export function LoginScreen() {
-  const user = useAppStore((s) => s.user)
-  const children = useAppStore((s) => s.state.children)
-  const setUser = useAppStore((s) => s.setUser)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(hasOAuthCallback)
-  const hasGoogle = googleConfigured()
+  const user = useAppStore((s) => s.user);
+  const children = useAppStore((s) => s.state.children);
+  const setUser = useAppStore((s) => s.setUser);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(hasOAuthCallback);
+  const hasGoogle = googleConfigured();
 
   useEffect(() => {
+    let cancelled = false;
     void consumeGoogleRedirect()
       .then((next) => {
-        if (next) setUser(next)
+        if (!cancelled && next) setUser(next);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Не удалось войти')
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Не удалось войти");
+        }
       })
       .finally(() => {
-        setPending(false)
-      })
-  }, [setUser])
+        if (!cancelled) setPending(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setUser]);
 
   if (user) {
-    return <Navigate to={children.length ? '/' : '/onboarding'} replace />
+    return <Navigate to={children.length ? "/" : "/onboarding"} replace />;
   }
 
   function google() {
-    setPending(true)
-    setError(null)
+    setPending(true);
+    setError(null);
     try {
-      startGoogleSignIn()
+      startGoogleSignIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось войти')
-      setPending(false)
+      setError(err instanceof Error ? err.message : "Не удалось войти");
+      setPending(false);
     }
   }
 
@@ -55,7 +61,7 @@ export function LoginScreen() {
             🍼
           </div>
           <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-ink dark:text-dark-text">
-            Нормы питания
+            babyfood-balance
           </h1>
           <p className="mt-2 max-w-xs text-muted dark:text-dark-muted">
             Считайте остаток детского питания по категориям — спокойно и без
@@ -82,12 +88,15 @@ export function LoginScreen() {
         ) : null}
         {!hasGoogle ? (
           <p className="text-center text-sm text-muted">
-            Чтобы войти через Google, задайте VITE_GOOGLE_CLIENT_ID в файле
-            .env
+            Чтобы войти через Google, задайте VITE_GOOGLE_CLIENT_ID в файле .env
           </p>
         ) : null}
-        <Button block disabled={!hasGoogle || pending} onClick={() => void google()}>
-          {pending ? 'Входим…' : 'Войти с помощью Google'}
+        <Button
+          block
+          disabled={!hasGoogle || pending}
+          onClick={() => void google()}
+        >
+          {pending ? "Входим…" : "Войти с помощью Google"}
         </Button>
         {!hasGoogle ? (
           <Button
@@ -95,8 +104,8 @@ export function LoginScreen() {
             variant="outline"
             onClick={() =>
               setUser({
-                name: 'Локально',
-                email: 'local@device',
+                name: "Локально",
+                email: "local@device",
                 local: true,
               })
             }
@@ -109,5 +118,5 @@ export function LoginScreen() {
         </p>
       </div>
     </div>
-  )
+  );
 }

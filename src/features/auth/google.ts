@@ -10,6 +10,7 @@ const STATE_KEY = 'babyfood-oauth-state'
 
 let tokenClient: GoogleTokenClient | null = null
 let accessToken: string | null = null
+let authEnabled = true
 let pendingToken:
   | { resolve: (token: string) => void; reject: (error: Error) => void }
   | null = null
@@ -67,6 +68,7 @@ export function persistUser(user: {
 }
 
 function saveToken(token: string, expiresIn = 3600) {
+  if (!authEnabled) return
   accessToken = token
   const expires_at = Date.now() + Math.max(60, expiresIn - 60) * 1000
   localStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token: token, expires_at }))
@@ -151,6 +153,10 @@ function ensureClient(): GoogleTokenClient {
       callback: (response) => {
         const pending = pendingToken
         pendingToken = null
+        if (!authEnabled) {
+          pending?.reject(new Error('Вышли из аккаунта'))
+          return
+        }
         if (response.error || !response.access_token) {
           pending?.reject(
             new Error(
@@ -217,6 +223,7 @@ async function consumeGoogleRedirectOnce(): Promise<GoogleProfile | null> {
   }
 
   const expiresIn = Number(params.get('expires_in') || '3600')
+  enableAuthSession()
   saveToken(token, Number.isFinite(expiresIn) ? expiresIn : 3600)
   const profile = await fetchProfile(token)
   return {
@@ -238,6 +245,7 @@ export function consumeGoogleRedirect(): Promise<GoogleProfile | null> {
 export function startGoogleSignIn() {
   const clientId = getGoogleClientId()
   if (!clientId) throw new Error('Не задан VITE_GOOGLE_CLIENT_ID')
+  enableAuthSession()
   const state = crypto.randomUUID()
   sessionStorage.setItem(STATE_KEY, state)
   const params = new URLSearchParams({
@@ -255,25 +263,40 @@ export function startGoogleSignIn() {
 }
 
 export async function ensureAccessToken(interactive = false): Promise<string> {
+  if (!authEnabled) throw new Error('Нет сессии')
   const stored = readStoredToken()
   if (stored) return stored
   await loadGis()
   try {
     return await requestToken(interactive ? 'consent' : '')
   } catch (error) {
-    if (!interactive) throw error
+    if (!interactive || !authEnabled) throw error
     startGoogleSignIn()
     throw new Error('Нужно снова войти через Google')
   }
 }
 
 export function clearAccessToken() {
+  authEnabled = false
+  consumePromise = null
+  if (pendingToken) {
+    pendingToken.reject(new Error('Вышли из аккаунта'))
+    pendingToken = null
+  }
   const token = accessToken ?? readStoredToken()
   accessToken = null
   localStorage.removeItem(TOKEN_KEY)
-  if (token && window.google?.accounts?.oauth2) {
-    window.google.accounts.oauth2.revoke(token)
+  try {
+    if (token && window.google?.accounts?.oauth2?.revoke) {
+      window.google.accounts.oauth2.revoke(token)
+    }
+  } catch {
+    /* Google SDK может быть не готов */
   }
+}
+
+export function enableAuthSession() {
+  authEnabled = true
 }
 
 export async function authorizedFetch(
