@@ -9,6 +9,7 @@ export function OnboardingScreen() {
   const categories = useAppStore((s) => s.state.categories)
   const addChild = useAppStore((s) => s.addChild)
   const saveCategory = useAppStore((s) => s.saveCategory)
+  const skipOnboarding = useAppStore((s) => s.skipOnboarding)
   const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
   const [limits, setLimits] = useState<Record<string, string>>({})
@@ -64,9 +65,19 @@ export function OnboardingScreen() {
               autoFocus
             />
           </div>
-          <div className="mt-auto pb-safe pt-8">
+          <div className="mt-auto space-y-2 pb-safe pt-8">
             <Button block disabled={!name.trim()} onClick={next}>
               Дальше
+            </Button>
+            <Button
+              block
+              variant="ghost"
+              onClick={() => {
+                skipOnboarding()
+                navigate('/', { replace: true })
+              }}
+            >
+              Пропустить
             </Button>
           </div>
         </>

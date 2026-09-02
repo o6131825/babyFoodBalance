@@ -34,6 +34,16 @@ import {
 } from '@/features/sync/engine'
 
 const THEME_KEY = 'babyfood-balance-theme'
+const ONBOARDING_KEY = 'babyfood-onboarding-seen'
+
+function readOnboardingSeen() {
+  return localStorage.getItem(ONBOARDING_KEY) === '1'
+}
+
+function persistOnboardingSeen(seen: boolean) {
+  if (seen) localStorage.setItem(ONBOARDING_KEY, '1')
+  else localStorage.removeItem(ONBOARDING_KEY)
+}
 
 type CategoryInput = {
   id?: string
@@ -63,6 +73,7 @@ type AppStore = {
   syncStatus: SyncStatus
   syncMessage: string | null
   dirty: boolean
+  onboardingSeen: boolean
   hydrate: () => Promise<void>
   setUser: (user: User | null) => void
   signOut: () => Promise<string | null>
@@ -83,6 +94,7 @@ type AppStore = {
   deleteProduct: (id: string) => void
   setQuantity: (productId: string, qty: number) => void
   resetPeriod: (scope: 'active' | 'all') => void
+  skipOnboarding: () => void
   clearGoogleData: () => Promise<string | null>
 }
 
@@ -109,6 +121,7 @@ function stamp(state: AppState): AppState {
 function emptyLocalState() {
   persistFileId(null)
   persistDataOwner(null)
+  persistOnboardingSeen(false)
   resetDriveCache()
   const state = createInitialState()
   void saveState(state)
@@ -149,6 +162,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     syncStatus: 'idle',
     syncMessage: null,
     dirty: false,
+    onboardingSeen: false,
 
     hydrate: async () => {
       let state = await loadState()
@@ -167,6 +181,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         user,
         hydrated: true,
         dirty: false,
+        onboardingSeen: readOnboardingSeen(),
         cloudReady: !needsCloud,
         syncStatus: user?.local
           ? 'local'
@@ -192,6 +207,7 @@ export const useAppStore = create<AppStore>((set, get) => {
           cloudReady: true,
           syncStatus: 'idle',
           syncMessage: null,
+          onboardingSeen: false,
         })
         return
       }
@@ -208,6 +224,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         user,
         state,
         dirty: switched ? false : get().dirty,
+        onboardingSeen: switched ? false : get().onboardingSeen,
         cloudReady: !needsCloud,
         syncStatus: user.local ? 'local' : 'syncing',
         syncMessage: null,
@@ -282,8 +299,14 @@ export const useAppStore = create<AppStore>((set, get) => {
     beginCloudRestore: () =>
       set({ cloudReady: false, syncStatus: 'syncing', syncMessage: null }),
 
+    skipOnboarding: () => {
+      persistOnboardingSeen(true)
+      set({ onboardingSeen: true })
+    },
+
     addChild: (name, copyFromChildId) => {
       const id = uid()
+      persistOnboardingSeen(true)
       commit((state) => ({
         ...state,
         children: [...state.children, { id, name: name.trim() }],
@@ -292,6 +315,7 @@ export const useAppStore = create<AppStore>((set, get) => {
           ? copyChildLimits(state.limits, copyFromChildId, id)
           : state.limits,
       }))
+      set({ onboardingSeen: true })
       return id
     },
 

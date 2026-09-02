@@ -10,6 +10,7 @@ export function AuthGate() {
   const cloudReady = useAppStore((s) => s.cloudReady)
   const syncStatus = useAppStore((s) => s.syncStatus)
   const syncMessage = useAppStore((s) => s.syncMessage)
+  const onboardingSeen = useAppStore((s) => s.onboardingSeen)
   const setUser = useAppStore((s) => s.setUser)
   const beginCloudRestore = useAppStore((s) => s.beginCloudRestore)
   const location = useLocation()
@@ -65,7 +66,7 @@ export function AuthGate() {
   }
 
   const onboarding = location.pathname.startsWith('/onboarding')
-  if (children.length === 0 && !onboarding) {
+  if (children.length === 0 && !onboarding && !onboardingSeen) {
     return <Navigate to="/onboarding" replace />
   }
   if (children.length > 0 && onboarding) {

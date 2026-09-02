@@ -37,22 +37,37 @@ export function DashboardScreen() {
   return (
     <div className="px-safe pt-safe">
       <header className="flex items-center gap-2 py-4">
-        <button
-          type="button"
-          onClick={() => setPicker(true)}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-surface px-3 py-2 text-left shadow-sm dark:bg-charcoal-2"
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-soft text-lg dark:bg-sage/20">
-            👶
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-extrabold">
-              {child?.name ?? 'Профиль'}
+        {state.children.length === 0 ? (
+          <Link
+            to="/settings"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-surface px-3 py-2 text-left shadow-sm dark:bg-charcoal-2"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-soft text-lg dark:bg-sage/20">
+              👶
             </span>
-            <span className="text-xs text-muted">сменить ребёнка</span>
-          </span>
-          <ChevronDown size={18} className="text-muted" />
-        </button>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-extrabold">Профиль</span>
+              <span className="text-xs text-muted">добавить ребёнка</span>
+            </span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPicker(true)}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-surface px-3 py-2 text-left shadow-sm dark:bg-charcoal-2"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-soft text-lg dark:bg-sage/20">
+              👶
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-extrabold">
+                {child?.name ?? 'Профиль'}
+              </span>
+              <span className="text-xs text-muted">сменить ребёнка</span>
+            </span>
+            <ChevronDown size={18} className="text-muted" />
+          </button>
+        )}
         <SyncBadge status={syncStatus} />
         <Link
           to="/settings"
@@ -69,7 +84,20 @@ export function DashboardScreen() {
       </p>
 
       <div className="mt-4 space-y-3">
-        {cards.length === 0 ? (
+        {state.children.length === 0 ? (
+          <div className="rounded-3xl bg-surface p-5 text-center dark:bg-charcoal-2">
+            <p className="font-bold">Пока нет профиля ребёнка</p>
+            <p className="mt-1 text-sm text-muted">
+              Добавьте ребёнка в настройках — лимиты и остатки считаются по
+              каждому профилю.
+            </p>
+            <Link to="/settings">
+              <Button className="mt-4" block>
+                Добавить ребёнка
+              </Button>
+            </Link>
+          </div>
+        ) : cards.length === 0 ? (
           <div className="rounded-3xl bg-surface p-5 text-center dark:bg-charcoal-2">
             <p className="font-bold">Пока нет лимитов</p>
             <p className="mt-1 text-sm text-muted">
