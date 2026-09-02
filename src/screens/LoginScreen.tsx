@@ -8,10 +8,11 @@ import {
 } from "@/features/auth/google";
 import { useAppStore } from "@/features/store/appStore";
 import { Button } from "@/shared/ui/Button";
+import { Splash } from "@/shared/ui/Splash";
 
 export function LoginScreen() {
   const user = useAppStore((s) => s.user);
-  const children = useAppStore((s) => s.state.children);
+  const cloudReady = useAppStore((s) => s.cloudReady);
   const setUser = useAppStore((s) => s.setUser);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(hasOAuthCallback);
@@ -36,8 +37,12 @@ export function LoginScreen() {
     };
   }, [setUser]);
 
+  if (user && !user.local && !cloudReady) {
+    return <Splash message="Загружаем данные с Диска…" />;
+  }
+
   if (user) {
-    return <Navigate to={children.length ? "/" : "/onboarding"} replace />;
+    return <Navigate to="/" replace />;
   }
 
   function google() {

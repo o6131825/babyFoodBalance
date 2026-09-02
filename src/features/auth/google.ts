@@ -176,7 +176,22 @@ function ensureClient(): GoogleTokenClient {
 function requestToken(prompt: '' | 'consent'): Promise<string> {
   const client = ensureClient()
   return new Promise((resolve, reject) => {
-    pendingToken = { resolve, reject }
+    let timer = 0
+    const wrappedResolve = (token: string) => {
+      window.clearTimeout(timer)
+      resolve(token)
+    }
+    const wrappedReject = (error: Error) => {
+      window.clearTimeout(timer)
+      reject(error)
+    }
+    timer = window.setTimeout(() => {
+      if (pendingToken?.reject === wrappedReject) {
+        pendingToken = null
+        wrappedReject(new Error('Google не ответил. Войдите ещё раз.'))
+      }
+    }, 12000)
+    pendingToken = { resolve: wrappedResolve, reject: wrappedReject }
     client.requestAccessToken({ prompt })
   })
 }

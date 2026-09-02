@@ -22,7 +22,7 @@ export function seedCategories(): Category[] {
 export function createInitialState(): AppState {
   return {
     version: 1,
-    updatedAt: new Date().toISOString(),
+    updatedAt: '1970-01-01T00:00:00.000Z',
     children: [],
     activeChildId: null,
     categories: seedCategories(),

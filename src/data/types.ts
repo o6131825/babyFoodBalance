@@ -83,6 +83,15 @@ export function isAppState(value: unknown): value is AppState {
   )
 }
 
+export function isBlankState(state: AppState): boolean {
+  return (
+    state.children.length === 0 &&
+    state.products.length === 0 &&
+    state.quantities.length === 0 &&
+    state.limits.length === 0
+  )
+}
+
 export const CATEGORY_ICONS = [
   '🍼',
   '🥣',

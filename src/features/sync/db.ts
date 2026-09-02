@@ -23,9 +23,7 @@ const db = new BabyFoodBalanceDB()
 export async function loadState(): Promise<AppState> {
   const row = await db.appState.get('main')
   if (row && isAppState(row.payload)) return row.payload
-  const initial = createInitialState()
-  await saveState(initial)
-  return initial
+  return createInitialState()
 }
 
 export async function saveState(state: AppState): Promise<void> {

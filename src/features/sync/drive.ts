@@ -15,11 +15,20 @@ export function persistFileId(id: string | null) {
 
 async function findFileId(): Promise<string | null> {
   const query = encodeURIComponent(`name='${FILE_NAME}' and trashed=false`)
-  const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`
+  const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name,modifiedTime,size)`
   const response = await authorizedFetch(url)
   if (!response.ok) throw new Error('Не удалось найти файл на Диске')
-  const body = (await response.json()) as { files?: { id: string }[] }
-  return body.files?.[0]?.id ?? null
+  const body = (await response.json()) as {
+    files?: { id: string; modifiedTime?: string; size?: string }[]
+  }
+  const files = body.files ?? []
+  if (files.length === 0) return null
+  files.sort((a, b) => {
+    const sizeDiff = Number(b.size ?? 0) - Number(a.size ?? 0)
+    if (sizeDiff !== 0) return sizeDiff
+    return (b.modifiedTime ?? '').localeCompare(a.modifiedTime ?? '')
+  })
+  return files[0]?.id ?? null
 }
 
 export async function downloadAppState(

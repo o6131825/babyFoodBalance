@@ -1,4 +1,4 @@
-import type { AppState, SyncStatus, User } from '@/data/types'
+import { isBlankState, type AppState, type SyncStatus, type User } from '@/data/types'
 import {
   downloadAppState,
   readStoredFileId,
@@ -10,9 +10,12 @@ type SyncApi = {
   state: AppState
   user: User | null
   dirty: boolean
+  syncStatus: SyncStatus
   setSyncStatus: (status: SyncStatus, message?: string | null) => void
   applyRemote: (state: AppState) => Promise<void>
   markClean: () => void
+  markCloudReady: () => void
+  beginCloudRestore: () => void
 }
 
 let getApi: (() => SyncApi) | null = null
@@ -69,6 +72,11 @@ export async function flushUpload() {
     api.setSyncStatus('offline')
     return
   }
+  if (isBlankState(api.state)) {
+    api.markClean()
+    api.setSyncStatus('synced')
+    return
+  }
   try {
     api.setSyncStatus('syncing')
     if (!fileId) fileId = await resolveDriveFileId()
@@ -89,9 +97,13 @@ export async function flushUpload() {
 export async function pullFromDrive() {
   const api = getApi?.()
   if (!api || pulling) return
-  if (!api.user || api.user.local) return
+  if (!api.user || api.user.local) {
+    api.markCloudReady()
+    return
+  }
   if (!online()) {
     api.setSyncStatus('offline')
+    api.markCloudReady()
     return
   }
 
@@ -102,8 +114,10 @@ export async function pullFromDrive() {
     fileId = await resolveDriveFileId()
     if (generation !== syncGeneration) return
     if (!fileId) {
-      fileId = await uploadAppState(api.state, null)
-      if (generation !== syncGeneration) return
+      if (!isBlankState(api.state)) {
+        fileId = await uploadAppState(api.state, null)
+        if (generation !== syncGeneration) return
+      }
       api.markClean()
       api.setSyncStatus('synced')
       return
@@ -112,6 +126,29 @@ export async function pullFromDrive() {
     const remote = await downloadAppState(fileId)
     if (generation !== syncGeneration) return
     if (!remote) {
+      if (!isBlankState(api.state)) {
+        fileId = await uploadAppState(api.state, fileId)
+        if (generation !== syncGeneration) return
+      }
+      api.markClean()
+      api.setSyncStatus('synced')
+      return
+    }
+
+    const localBlank = isBlankState(api.state)
+    const remoteBlank = isBlankState(remote)
+    const localTime = Date.parse(api.state.updatedAt) || 0
+    const remoteTime = Date.parse(remote.updatedAt) || 0
+    const localNewer = localTime >= remoteTime
+
+    if (localBlank && !remoteBlank) {
+      await api.applyRemote(remote)
+      if (generation !== syncGeneration) return
+      api.setSyncStatus('synced', 'Синхронизировано с другого устройства')
+      return
+    }
+
+    if (!localBlank && remoteBlank) {
       fileId = await uploadAppState(api.state, fileId)
       if (generation !== syncGeneration) return
       api.markClean()
@@ -119,11 +156,7 @@ export async function pullFromDrive() {
       return
     }
 
-    const localTime = Date.parse(api.state.updatedAt)
-    const remoteTime = Date.parse(remote.updatedAt)
-    const localNewer = localTime >= remoteTime
-
-    if (api.dirty && localNewer) {
+    if (api.dirty && localNewer && !localBlank) {
       fileId = await uploadAppState(api.state, fileId)
       if (generation !== syncGeneration) return
       api.markClean()
@@ -138,7 +171,7 @@ export async function pullFromDrive() {
       return
     }
 
-    if (api.dirty) {
+    if (api.dirty && !localBlank) {
       fileId = await uploadAppState(api.state, fileId)
       if (generation !== syncGeneration) return
       api.markClean()
@@ -152,12 +185,17 @@ export async function pullFromDrive() {
       error instanceof Error ? error.message : 'Ошибка синхронизации',
     )
   } finally {
-    if (generation === syncGeneration) pulling = false
+    if (generation === syncGeneration) {
+      pulling = false
+      getApi?.()?.markCloudReady()
+    }
   }
 }
 
 export function listenNetwork() {
   window.addEventListener('online', () => {
+    const api = getApi?.()
+    if (api && isBlankState(api.state)) api.beginCloudRestore()
     void pullFromDrive()
     scheduleUpload()
   })
@@ -165,6 +203,14 @@ export function listenNetwork() {
     getApi?.()?.setSyncStatus('offline')
   })
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) void pullFromDrive()
+    if (document.hidden) return
+    const api = getApi?.()
+    if (api && isBlankState(api.state)) {
+      if (api.syncStatus === 'synced') return
+      if (api.syncStatus === 'error' || api.syncStatus === 'offline') {
+        api.beginCloudRestore()
+      }
+    }
+    void pullFromDrive()
   })
 }

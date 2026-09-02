@@ -48,6 +48,7 @@ type ProductInput = {
 
 type AppStore = {
   hydrated: boolean
+  cloudReady: boolean
   state: AppState
   theme: ThemeMode
   user: User | null
@@ -60,6 +61,8 @@ type AppStore = {
   setSyncStatus: (status: SyncStatus, message?: string | null) => void
   applyRemote: (state: AppState) => Promise<void>
   markClean: () => void
+  markCloudReady: () => void
+  beginCloudRestore: () => void
   addChild: (name: string, copyFromChildId?: string | null) => string
   renameChild: (id: string, name: string) => void
   deleteChild: (id: string) => void
@@ -120,6 +123,7 @@ export const useAppStore = create<AppStore>((set, get) => {
 
   return {
     hydrated: false,
+    cloudReady: false,
     state: createInitialState(),
     theme: 'system',
     user: null,
@@ -132,12 +136,20 @@ export const useAppStore = create<AppStore>((set, get) => {
       const theme = readTheme()
       applyTheme(theme)
       const user = readStoredUser()
+      const needsCloud = Boolean(user && !user.local && navigator.onLine)
       set({
         state,
         theme,
         user,
         hydrated: true,
-        syncStatus: user?.local ? 'local' : navigator.onLine ? 'idle' : 'offline',
+        cloudReady: !needsCloud,
+        syncStatus: user?.local
+          ? 'local'
+          : navigator.onLine
+            ? needsCloud
+              ? 'syncing'
+              : 'idle'
+            : 'offline',
       })
       if (user && !user.local) {
         void pullFromDrive()
@@ -156,8 +168,10 @@ export const useAppStore = create<AppStore>((set, get) => {
         resetDriveCache()
       }
       persistUser(user)
+      const needsCloud = Boolean(user && !user.local)
       set({
         user,
+        cloudReady: !needsCloud,
         syncStatus: user?.local ? 'local' : user ? 'syncing' : 'idle',
         syncMessage: null,
       })
@@ -180,6 +194,11 @@ export const useAppStore = create<AppStore>((set, get) => {
     },
 
     markClean: () => set({ dirty: false }),
+
+    markCloudReady: () => set({ cloudReady: true }),
+
+    beginCloudRestore: () =>
+      set({ cloudReady: false, syncStatus: 'syncing', syncMessage: null }),
 
     addChild: (name, copyFromChildId) => {
       const id = uid()
@@ -348,9 +367,12 @@ attachSyncStore(() => {
     state: current.state,
     user: current.user,
     dirty: current.dirty,
+    syncStatus: current.syncStatus,
     setSyncStatus: current.setSyncStatus,
     applyRemote: current.applyRemote,
     markClean: current.markClean,
+    markCloudReady: current.markCloudReady,
+    beginCloudRestore: current.beginCloudRestore,
   }
 })
 
