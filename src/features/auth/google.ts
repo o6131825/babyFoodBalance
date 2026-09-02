@@ -5,12 +5,27 @@ const SCOPES = [
 ].join(' ')
 
 const USER_KEY = 'babyfood-balance-user'
+const TOKEN_KEY = 'babyfood-oauth-token'
+const STATE_KEY = 'babyfood-oauth-state'
 
 let tokenClient: GoogleTokenClient | null = null
 let accessToken: string | null = null
 let pendingToken:
   | { resolve: (token: string) => void; reject: (error: Error) => void }
   | null = null
+let consumePromise: Promise<GoogleProfile | null> | null = null
+
+type StoredToken = {
+  access_token: string
+  expires_at: number
+}
+
+export type GoogleProfile = {
+  name: string
+  email: string
+  picture?: string
+  local: false
+}
 
 export function getGoogleClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? ''
@@ -18,6 +33,10 @@ export function getGoogleClientId(): string {
 
 export function googleConfigured(): boolean {
   return getGoogleClientId().length > 0
+}
+
+export function oauthRedirectUri(): string {
+  return `${window.location.origin}/login`
 }
 
 export function readStoredUser() {
@@ -47,6 +66,41 @@ export function persistUser(user: {
   else localStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
+function saveToken(token: string, expiresIn = 3600) {
+  accessToken = token
+  const expires_at = Date.now() + Math.max(60, expiresIn - 60) * 1000
+  localStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token: token, expires_at }))
+}
+
+function readStoredToken(): string | null {
+  if (accessToken) return accessToken
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as StoredToken
+    if (!parsed.access_token || parsed.expires_at <= Date.now()) {
+      localStorage.removeItem(TOKEN_KEY)
+      return null
+    }
+    accessToken = parsed.access_token
+    return accessToken
+  } catch {
+    return null
+  }
+}
+
+function oauthErrorMessage(error?: string, description?: string) {
+  if (error === 'origin_mismatch' || error === 'redirect_uri_mismatch') {
+    return [
+      'Google отклонил адрес приложения.',
+      `В Client ID добавьте JavaScript origin: ${window.location.origin}`,
+      `и Redirect URI: ${oauthRedirectUri()}`,
+    ].join(' ')
+  }
+  if (error === 'access_denied') return 'Вход отменён'
+  return description || error || 'Не удалось войти через Google'
+}
+
 function loadGis(): Promise<void> {
   if (window.google?.accounts?.oauth2) return Promise.resolve()
   return new Promise((resolve, reject) => {
@@ -63,6 +117,7 @@ function loadGis(): Promise<void> {
     const script = document.createElement('script')
     script.src = 'https://accounts.google.com/gsi/client'
     script.async = true
+    script.referrerPolicy = 'strict-origin-when-cross-origin'
     script.dataset.gis = 'true'
     script.onload = () => resolve()
     script.onerror = () =>
@@ -98,11 +153,13 @@ function ensureClient(): GoogleTokenClient {
         pendingToken = null
         if (response.error || !response.access_token) {
           pending?.reject(
-            new Error(response.error_description || response.error || 'Отказ в доступе'),
+            new Error(
+              oauthErrorMessage(response.error, response.error_description),
+            ),
           )
           return
         }
-        accessToken = response.access_token
+        saveToken(response.access_token, response.expires_in)
         pending?.resolve(response.access_token)
       },
     })
@@ -118,27 +175,102 @@ function requestToken(prompt: '' | 'consent'): Promise<string> {
   })
 }
 
-export async function signInWithGoogle() {
-  await loadGis()
-  const token = await requestToken('consent')
+function callbackParams() {
+  const hash = window.location.hash.startsWith('#')
+    ? window.location.hash.slice(1)
+    : ''
+  const search = window.location.search.startsWith('?')
+    ? window.location.search.slice(1)
+    : ''
+  return new URLSearchParams(hash || search)
+}
+
+export function hasOAuthCallback() {
+  const params = callbackParams()
+  return params.has('access_token') || params.has('error')
+}
+
+function clearCallbackUrl() {
+  window.history.replaceState(null, '', window.location.pathname)
+}
+
+async function consumeGoogleRedirectOnce(): Promise<GoogleProfile | null> {
+  if (!hasOAuthCallback()) return null
+  const params = callbackParams()
+  clearCallbackUrl()
+
+  const error = params.get('error')
+  if (error) {
+    throw new Error(
+      oauthErrorMessage(error, params.get('error_description') ?? undefined),
+    )
+  }
+
+  const token = params.get('access_token')
+  if (!token) return null
+
+  const expected = sessionStorage.getItem(STATE_KEY)
+  const state = params.get('state')
+  sessionStorage.removeItem(STATE_KEY)
+  if (expected && state && expected !== state) {
+    throw new Error('Сессия входа устарела. Повторите попытку.')
+  }
+
+  const expiresIn = Number(params.get('expires_in') || '3600')
+  saveToken(token, Number.isFinite(expiresIn) ? expiresIn : 3600)
   const profile = await fetchProfile(token)
   return {
     name: profile.name || 'Google',
     email: profile.email || '',
     picture: profile.picture,
-    local: false as const,
+    local: false,
   }
 }
 
+export function consumeGoogleRedirect(): Promise<GoogleProfile | null> {
+  if (!consumePromise) {
+    if (!hasOAuthCallback()) return Promise.resolve(null)
+    consumePromise = consumeGoogleRedirectOnce()
+  }
+  return consumePromise
+}
+
+export function startGoogleSignIn() {
+  const clientId = getGoogleClientId()
+  if (!clientId) throw new Error('Не задан VITE_GOOGLE_CLIENT_ID')
+  const state = crypto.randomUUID()
+  sessionStorage.setItem(STATE_KEY, state)
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: oauthRedirectUri(),
+    response_type: 'token',
+    scope: SCOPES,
+    include_granted_scopes: 'true',
+    state,
+    prompt: 'select_account',
+  })
+  window.location.assign(
+    `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+  )
+}
+
 export async function ensureAccessToken(interactive = false): Promise<string> {
-  if (accessToken) return accessToken
+  const stored = readStoredToken()
+  if (stored) return stored
   await loadGis()
-  return requestToken(interactive ? 'consent' : '')
+  try {
+    return await requestToken(interactive ? 'consent' : '')
+  } catch (error) {
+    if (!interactive) throw error
+    startGoogleSignIn()
+    throw new Error('Нужно снова войти через Google')
+  }
 }
 
 export function clearAccessToken() {
-  const token = accessToken
+  const token = accessToken ?? readStoredToken()
   accessToken = null
+  localStorage.removeItem(TOKEN_KEY)
   if (token && window.google?.accounts?.oauth2) {
     window.google.accounts.oauth2.revoke(token)
   }
@@ -154,6 +286,7 @@ export async function authorizedFetch(
   let response = await fetch(input, { ...init, headers })
   if (response.status === 401) {
     accessToken = null
+    localStorage.removeItem(TOKEN_KEY)
     const next = await ensureAccessToken(true)
     headers.set('Authorization', `Bearer ${next}`)
     response = await fetch(input, { ...init, headers })

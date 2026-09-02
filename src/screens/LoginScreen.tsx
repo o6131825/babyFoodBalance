@@ -1,6 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { googleConfigured, signInWithGoogle } from '@/features/auth/google'
+import {
+  consumeGoogleRedirect,
+  googleConfigured,
+  hasOAuthCallback,
+  startGoogleSignIn,
+} from '@/features/auth/google'
 import { useAppStore } from '@/features/store/appStore'
 import { Button } from '@/shared/ui/Button'
 
@@ -9,22 +14,33 @@ export function LoginScreen() {
   const children = useAppStore((s) => s.state.children)
   const setUser = useAppStore((s) => s.setUser)
   const [error, setError] = useState<string | null>(null)
-  const [pending, setPending] = useState(false)
+  const [pending, setPending] = useState(hasOAuthCallback)
   const hasGoogle = googleConfigured()
+
+  useEffect(() => {
+    void consumeGoogleRedirect()
+      .then((next) => {
+        if (next) setUser(next)
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Не удалось войти')
+      })
+      .finally(() => {
+        setPending(false)
+      })
+  }, [setUser])
 
   if (user) {
     return <Navigate to={children.length ? '/' : '/onboarding'} replace />
   }
 
-  async function google() {
+  function google() {
     setPending(true)
     setError(null)
     try {
-      const next = await signInWithGoogle()
-      setUser(next)
+      startGoogleSignIn()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось войти')
-    } finally {
       setPending(false)
     }
   }
