@@ -21,13 +21,16 @@ import {
   readDataOwner,
   saveState,
 } from '@/features/sync/db'
-import { persistFileId } from '@/features/sync/drive'
+import { deleteAllAppDataFiles, persistFileId } from '@/features/sync/drive'
 import {
   attachSyncStore,
+  flushBeforeLogout,
   listenNetwork,
   pullFromDrive,
   resetDriveCache,
   scheduleUpload,
+  setSyncPaused,
+  waitForSyncIdle,
 } from '@/features/sync/engine'
 
 const THEME_KEY = 'babyfood-balance-theme'
@@ -62,6 +65,7 @@ type AppStore = {
   dirty: boolean
   hydrate: () => Promise<void>
   setUser: (user: User | null) => void
+  signOut: () => Promise<string | null>
   setTheme: (theme: ThemeMode) => void
   setSyncStatus: (status: SyncStatus, message?: string | null) => void
   applyRemote: (state: AppState) => Promise<void>
@@ -79,6 +83,7 @@ type AppStore = {
   deleteProduct: (id: string) => void
   setQuantity: (productId: string, qty: number) => void
   resetPeriod: (scope: 'active' | 'all') => void
+  clearGoogleData: () => Promise<string | null>
 }
 
 function readTheme(): ThemeMode {
@@ -103,6 +108,7 @@ function stamp(state: AppState): AppState {
 
 function emptyLocalState() {
   persistFileId(null)
+  persistDataOwner(null)
   resetDriveCache()
   const state = createInitialState()
   void saveState(state)
@@ -179,10 +185,10 @@ export const useAppStore = create<AppStore>((set, get) => {
       if (!user) {
         clearAccessToken()
         persistUser(null)
-        persistFileId(null)
-        resetDriveCache()
         set({
           user: null,
+          state: emptyLocalState(),
+          dirty: false,
           cloudReady: true,
           syncStatus: 'idle',
           syncMessage: null,
@@ -207,6 +213,59 @@ export const useAppStore = create<AppStore>((set, get) => {
         syncMessage: null,
       })
       if (!user.local) void pullFromDrive()
+    },
+
+    signOut: async () => {
+      const user = get().user
+      if (!user) return null
+      if (!user.local) {
+        const result = await flushBeforeLogout()
+        if (!result.ok) return result.message
+      }
+      get().setUser(null)
+      return null
+    },
+
+    clearGoogleData: async () => {
+      const user = get().user
+      if (!user || user.local) {
+        return 'Нужен вход через Google'
+      }
+      if (!navigator.onLine) {
+        return 'Нет сети. Подключитесь к интернету, чтобы удалить данные с Диска.'
+      }
+
+      setSyncPaused(true)
+      set({
+        syncStatus: 'syncing',
+        syncMessage: 'Удаляем данные из Google…',
+      })
+      let failed = false
+      try {
+        await waitForSyncIdle()
+        await deleteAllAppDataFiles()
+        const state = createInitialState()
+        await saveState(state)
+        persistFileId(null)
+        resetDriveCache()
+        set({
+          state,
+          dirty: false,
+          cloudReady: true,
+          syncStatus: 'synced',
+          syncMessage: 'Данные в Google-аккаунте удалены',
+        })
+        return null
+      } catch (error) {
+        failed = true
+        const message =
+          error instanceof Error ? error.message : 'Не удалось удалить данные'
+        set({ syncStatus: 'error', syncMessage: message })
+        return message
+      } finally {
+        setSyncPaused(false)
+        if (failed) scheduleUpload()
+      }
     },
 
     setTheme: (theme) => {
@@ -399,6 +458,7 @@ attachSyncStore(() => {
     user: current.user,
     dirty: current.dirty,
     syncStatus: current.syncStatus,
+    syncMessage: current.syncMessage,
     setSyncStatus: current.setSyncStatus,
     applyRemote: current.applyRemote,
     markClean: current.markClean,

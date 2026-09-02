@@ -6,6 +6,7 @@ type Props = {
   description?: string
   confirmLabel?: string
   danger?: boolean
+  busy?: boolean
   onConfirm: () => void
   onClose: () => void
 }
@@ -16,6 +17,7 @@ export function Dialog({
   description,
   confirmLabel = 'Подтвердить',
   danger,
+  busy,
   onConfirm,
   onClose,
 }: Props) {
@@ -27,6 +29,7 @@ export function Dialog({
         type="button"
         aria-label="Закрыть"
         className="absolute inset-0 bg-ink/40 dark:bg-black/60"
+        disabled={busy}
         onClick={onClose}
       />
       <div className="relative w-full max-w-sm rounded-3xl bg-surface p-5 shadow-xl dark:bg-charcoal-2">
@@ -39,12 +42,18 @@ export function Dialog({
           </p>
         ) : null}
         <div className="mt-5 flex gap-3">
-          <Button variant="ghost" className="flex-1" onClick={onClose}>
+          <Button
+            variant="ghost"
+            className="flex-1"
+            disabled={busy}
+            onClick={onClose}
+          >
             Отмена
           </Button>
           <Button
             variant={danger ? 'danger' : 'primary'}
             className="flex-1"
+            disabled={busy}
             onClick={onConfirm}
           >
             {confirmLabel}

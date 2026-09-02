@@ -9,6 +9,7 @@ import {
   Moon,
   Plus,
   Sun,
+  Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -46,7 +47,7 @@ export function SettingsScreen() {
   const user = useAppStore((s) => s.user)
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
-  const setUser = useAppStore((s) => s.setUser)
+  const signOut = useAppStore((s) => s.signOut)
   const syncStatus = useAppStore((s) => s.syncStatus)
   const syncMessage = useAppStore((s) => s.syncMessage)
   const addChild = useAppStore((s) => s.addChild)
@@ -54,6 +55,7 @@ export function SettingsScreen() {
   const deleteChild = useAppStore((s) => s.deleteChild)
   const copyLimitsFrom = useAppStore((s) => s.copyLimitsFrom)
   const resetPeriod = useAppStore((s) => s.resetPeriod)
+  const clearGoogleData = useAppStore((s) => s.clearGoogleData)
   const { event: installEvent, installed, install } = useInstallPrompt()
 
   const [childSheet, setChildSheet] = useState<ChildDraft | null>(null)
@@ -64,6 +66,11 @@ export function SettingsScreen() {
   } | null>(null)
   const [periodScope, setPeriodScope] = useState<'active' | 'all' | null>(null)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [logoutBusy, setLogoutBusy] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
+  const [clearCloudOpen, setClearCloudOpen] = useState(false)
+  const [clearCloudBusy, setClearCloudBusy] = useState(false)
+  const [clearCloudError, setClearCloudError] = useState<string | null>(null)
 
   const active = state.children.find((item) => item.id === state.activeChildId)
 
@@ -258,12 +265,40 @@ export function SettingsScreen() {
         )}
       </div>
 
+      {!user?.local ? (
+        <>
+          <h2 className="mt-6 mb-2 text-sm font-bold text-muted">Google Диск</h2>
+          <div className="space-y-3 rounded-3xl bg-surface p-4 dark:bg-charcoal-2">
+            <p className="text-sm text-muted">
+              Удалит детей, категории, товары и остатки из скрытой папки
+              приложения в вашем Google-аккаунте. На этом устройстве данные тоже
+              сбросятся — иначе они снова улетят в облако.
+            </p>
+            <Button
+              variant="outline"
+              block
+              className="text-danger"
+              onClick={() => {
+                setClearCloudError(null)
+                setClearCloudOpen(true)
+              }}
+            >
+              <Trash2 size={18} />
+              Очистить данные в Google
+            </Button>
+          </div>
+        </>
+      ) : null}
+
       <div className="mt-6">
         <Button
           variant="ghost"
           block
           className="text-danger"
-          onClick={() => setLogoutOpen(true)}
+          onClick={() => {
+            setLogoutError(null)
+            setLogoutOpen(true)
+          }}
         >
           <LogOut size={18} />
           Выйти из аккаунта
@@ -436,15 +471,65 @@ export function SettingsScreen() {
       />
 
       <Dialog
+        open={clearCloudOpen}
+        title="Удалить данные из Google?"
+        description={
+          clearCloudError ??
+          'Все дети, категории, товары и остатки будут удалены из вашего Google-аккаунта и с этого устройства. Отменить нельзя.'
+        }
+        confirmLabel={clearCloudBusy ? 'Удаляем…' : 'Удалить всё'}
+        danger
+        busy={clearCloudBusy}
+        onClose={() => {
+          if (clearCloudBusy) return
+          setClearCloudOpen(false)
+          setClearCloudError(null)
+        }}
+        onConfirm={() => {
+          if (clearCloudBusy) return
+          setClearCloudBusy(true)
+          setClearCloudError(null)
+          void clearGoogleData().then((error) => {
+            setClearCloudBusy(false)
+            if (error) {
+              setClearCloudError(error)
+              return
+            }
+            setClearCloudOpen(false)
+          })
+        }}
+      />
+
+      <Dialog
         open={logoutOpen}
         title="Выйти?"
-        description="Дети останутся на этом устройстве для того же Google-аккаунта. Если войдёте другим — подтянутся его данные с Диска."
-        confirmLabel="Выйти"
-        onClose={() => setLogoutOpen(false)}
-        onConfirm={() => {
-          setUser(null)
+        description={
+          logoutError ??
+          (user?.local
+            ? 'Данные на этом устройстве будут удалены.'
+            : 'Сначала дождёмся записи на Диск, затем дети и остатки удалятся с этого устройства.')
+        }
+        confirmLabel={logoutBusy ? 'Сохраняем…' : 'Выйти'}
+        danger
+        busy={logoutBusy}
+        onClose={() => {
+          if (logoutBusy) return
           setLogoutOpen(false)
-          navigate('/login', { replace: true })
+          setLogoutError(null)
+        }}
+        onConfirm={() => {
+          if (logoutBusy) return
+          setLogoutBusy(true)
+          setLogoutError(null)
+          void signOut().then((error) => {
+            setLogoutBusy(false)
+            if (error) {
+              setLogoutError(error)
+              return
+            }
+            setLogoutOpen(false)
+            navigate('/login', { replace: true })
+          })
         }}
       />
     </div>

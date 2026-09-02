@@ -91,3 +91,43 @@ export async function resolveDriveFileId(): Promise<string | null> {
   persistFileId(found)
   return found
 }
+
+async function listAppDataFileIds(): Promise<string[]> {
+  const ids: string[] = []
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({
+      spaces: 'appDataFolder',
+      fields: 'nextPageToken,files(id)',
+      pageSize: '100',
+    })
+    if (pageToken) params.set('pageToken', pageToken)
+    const response = await authorizedFetch(
+      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+    )
+    if (!response.ok) throw new Error('Не удалось получить файлы на Диске')
+    const body = (await response.json()) as {
+      files?: { id: string }[]
+      nextPageToken?: string
+    }
+    for (const file of body.files ?? []) ids.push(file.id)
+    pageToken = body.nextPageToken
+  } while (pageToken)
+  return ids
+}
+
+export async function deleteAllAppDataFiles(): Promise<void> {
+  const ids = await listAppDataFileIds()
+  await Promise.all(
+    ids.map(async (id) => {
+      const response = await authorizedFetch(
+        `https://www.googleapis.com/drive/v3/files/${id}`,
+        { method: 'DELETE' },
+      )
+      if (!response.ok && response.status !== 404) {
+        throw new Error('Не удалось удалить данные с Диска')
+      }
+    }),
+  )
+  persistFileId(null)
+}
