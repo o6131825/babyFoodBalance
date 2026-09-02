@@ -272,7 +272,7 @@ export function SettingsScreen() {
             <p className="text-sm text-muted">
               Удалит детей, категории, товары и остатки из скрытой папки
               приложения в вашем Google-аккаунте. На этом устройстве данные тоже
-              сбросятся — иначе они снова улетят в облако.
+              сбросятся, затем вы выйдете из аккаунта.
             </p>
             <Button
               variant="outline"
@@ -475,7 +475,7 @@ export function SettingsScreen() {
         title="Удалить данные из Google?"
         description={
           clearCloudError ??
-          'Все дети, категории, товары и остатки будут удалены из вашего Google-аккаунта и с этого устройства. Отменить нельзя.'
+          'Все дети, категории, товары и остатки будут удалены из вашего Google-аккаунта и с этого устройства. Затем вы выйдете из аккаунта. Отменить нельзя.'
         }
         confirmLabel={clearCloudBusy ? 'Удаляем…' : 'Удалить всё'}
         danger
@@ -496,6 +496,7 @@ export function SettingsScreen() {
               return
             }
             setClearCloudOpen(false)
+            navigate('/login', { replace: true })
           })
         }}
       />

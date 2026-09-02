@@ -244,17 +244,9 @@ export const useAppStore = create<AppStore>((set, get) => {
       try {
         await waitForSyncIdle()
         await deleteAllAppDataFiles()
-        const state = createInitialState()
-        await saveState(state)
         persistFileId(null)
         resetDriveCache()
-        set({
-          state,
-          dirty: false,
-          cloudReady: true,
-          syncStatus: 'synced',
-          syncMessage: 'Данные в Google-аккаунте удалены',
-        })
+        get().setUser(null)
         return null
       } catch (error) {
         failed = true
