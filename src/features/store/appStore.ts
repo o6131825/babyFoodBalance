@@ -15,7 +15,12 @@ import {
   readStoredUser,
 } from '@/features/auth/google'
 import { uid } from '@/features/calculator'
-import { loadState, saveState } from '@/features/sync/db'
+import {
+  loadState,
+  persistDataOwner,
+  readDataOwner,
+  saveState,
+} from '@/features/sync/db'
 import { persistFileId } from '@/features/sync/drive'
 import {
   attachSyncStore,
@@ -96,6 +101,14 @@ function stamp(state: AppState): AppState {
   return { ...state, updatedAt: new Date().toISOString() }
 }
 
+function emptyLocalState() {
+  persistFileId(null)
+  resetDriveCache()
+  const state = createInitialState()
+  void saveState(state)
+  return state
+}
+
 function copyChildLimits(
   limits: AppState['limits'],
   fromChildId: string,
@@ -132,16 +145,22 @@ export const useAppStore = create<AppStore>((set, get) => {
     dirty: false,
 
     hydrate: async () => {
-      const state = await loadState()
+      let state = await loadState()
       const theme = readTheme()
       applyTheme(theme)
       const user = readStoredUser()
+      const owner = readDataOwner()
+      if (user && owner && user.email !== owner) {
+        state = emptyLocalState()
+        persistDataOwner(user.email)
+      }
       const needsCloud = Boolean(user && !user.local && navigator.onLine)
       set({
         state,
         theme,
         user,
         hydrated: true,
+        dirty: false,
         cloudReady: !needsCloud,
         syncStatus: user?.local
           ? 'local'
@@ -157,25 +176,37 @@ export const useAppStore = create<AppStore>((set, get) => {
     },
 
     setUser: (user) => {
-      const prev = get().user
       if (!user) {
         clearAccessToken()
-      } else if (!user.local) {
-        enableAuthSession()
-      }
-      if (!user || prev?.email !== user.email) {
+        persistUser(null)
         persistFileId(null)
         resetDriveCache()
+        set({
+          user: null,
+          cloudReady: true,
+          syncStatus: 'idle',
+          syncMessage: null,
+        })
+        return
       }
+
+      if (!user.local) enableAuthSession()
       persistUser(user)
-      const needsCloud = Boolean(user && !user.local)
+
+      const owner = readDataOwner()
+      const switched = Boolean(owner && owner !== user.email)
+      const state = switched ? emptyLocalState() : get().state
+      persistDataOwner(user.email)
+      const needsCloud = !user.local
       set({
         user,
+        state,
+        dirty: switched ? false : get().dirty,
         cloudReady: !needsCloud,
-        syncStatus: user?.local ? 'local' : user ? 'syncing' : 'idle',
+        syncStatus: user.local ? 'local' : 'syncing',
         syncMessage: null,
       })
-      if (user && !user.local) void pullFromDrive()
+      if (!user.local) void pullFromDrive()
     },
 
     setTheme: (theme) => {

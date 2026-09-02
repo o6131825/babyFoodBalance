@@ -1,4 +1,5 @@
 import { isBlankState, type AppState, type SyncStatus, type User } from '@/data/types'
+import { dataBelongsTo } from '@/features/sync/db'
 import {
   downloadAppState,
   readStoredFileId,
@@ -49,6 +50,10 @@ export function scheduleUpload() {
     api.setSyncStatus(api.user?.local ? 'local' : 'idle')
     return
   }
+  if (!dataBelongsTo(api.user.email)) {
+    api.setSyncStatus('idle')
+    return
+  }
   if (!online()) {
     api.setSyncStatus('offline')
     return
@@ -66,6 +71,10 @@ export async function flushUpload() {
   const generation = syncGeneration
   if (!api.user || api.user.local) {
     api.setSyncStatus(api.user?.local ? 'local' : 'idle')
+    return
+  }
+  if (!dataBelongsTo(api.user.email)) {
+    api.setSyncStatus('idle')
     return
   }
   if (!online()) {
@@ -106,6 +115,12 @@ export async function pullFromDrive() {
     api.markCloudReady()
     return
   }
+  const canUpload = dataBelongsTo(api.user.email)
+  if (!canUpload && !isBlankState(api.state)) {
+    api.setSyncStatus('idle')
+    api.markCloudReady()
+    return
+  }
 
   const generation = syncGeneration
   pulling = true
@@ -114,7 +129,7 @@ export async function pullFromDrive() {
     fileId = await resolveDriveFileId()
     if (generation !== syncGeneration) return
     if (!fileId) {
-      if (!isBlankState(api.state)) {
+      if (!isBlankState(api.state) && canUpload) {
         fileId = await uploadAppState(api.state, null)
         if (generation !== syncGeneration) return
       }
@@ -126,7 +141,7 @@ export async function pullFromDrive() {
     const remote = await downloadAppState(fileId)
     if (generation !== syncGeneration) return
     if (!remote) {
-      if (!isBlankState(api.state)) {
+      if (!isBlankState(api.state) && canUpload) {
         fileId = await uploadAppState(api.state, fileId)
         if (generation !== syncGeneration) return
       }
@@ -149,14 +164,16 @@ export async function pullFromDrive() {
     }
 
     if (!localBlank && remoteBlank) {
-      fileId = await uploadAppState(api.state, fileId)
-      if (generation !== syncGeneration) return
+      if (canUpload) {
+        fileId = await uploadAppState(api.state, fileId)
+        if (generation !== syncGeneration) return
+      }
       api.markClean()
       api.setSyncStatus('synced')
       return
     }
 
-    if (api.dirty && localNewer && !localBlank) {
+    if (api.dirty && localNewer && !localBlank && canUpload) {
       fileId = await uploadAppState(api.state, fileId)
       if (generation !== syncGeneration) return
       api.markClean()
@@ -171,7 +188,7 @@ export async function pullFromDrive() {
       return
     }
 
-    if (api.dirty && !localBlank) {
+    if (api.dirty && !localBlank && canUpload) {
       fileId = await uploadAppState(api.state, fileId)
       if (generation !== syncGeneration) return
       api.markClean()

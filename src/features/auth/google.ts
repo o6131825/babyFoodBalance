@@ -1,12 +1,12 @@
-const SCOPES = [
-  'https://www.googleapis.com/auth/drive.appdata',
-  'email',
-  'profile',
-].join(' ')
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata'
+const SCOPES = [DRIVE_SCOPE, 'email', 'profile'].join(' ')
 
 const USER_KEY = 'babyfood-balance-user'
 const TOKEN_KEY = 'babyfood-oauth-token'
 const STATE_KEY = 'babyfood-oauth-state'
+const CONSENT_KEY = 'babyfood-oauth-force-consent'
+const SCOPE_ERROR =
+  'Google не дал доступ к Диску. В Google Cloud → Data Access добавьте scope drive.appdata, сохраните, затем выйдите и войдите снова, не снимая галочку доступа к Диску.'
 
 let tokenClient: GoogleTokenClient | null = null
 let accessToken: string | null = null
@@ -91,6 +91,14 @@ function readStoredToken(): string | null {
   }
 }
 
+function tokenHasDriveScope(scope?: string | null) {
+  if (!scope) return false
+  return scope
+    .split(/[\s+,]+/)
+    .filter(Boolean)
+    .includes(DRIVE_SCOPE)
+}
+
 function oauthErrorMessage(error?: string, description?: string) {
   if (error === 'origin_mismatch' || error === 'redirect_uri_mismatch') {
     return [
@@ -165,6 +173,10 @@ function ensureClient(): GoogleTokenClient {
           )
           return
         }
+        if (response.scope && !tokenHasDriveScope(response.scope)) {
+          pending?.reject(new Error(SCOPE_ERROR))
+          return
+        }
         saveToken(response.access_token, response.expires_in)
         pending?.resolve(response.access_token)
       },
@@ -237,6 +249,16 @@ async function consumeGoogleRedirectOnce(): Promise<GoogleProfile | null> {
     throw new Error('Сессия входа устарела. Повторите попытку.')
   }
 
+  if (!tokenHasDriveScope(params.get('scope'))) {
+    if (sessionStorage.getItem(CONSENT_KEY)) {
+      sessionStorage.removeItem(CONSENT_KEY)
+      throw new Error(SCOPE_ERROR)
+    }
+    startGoogleSignIn({ consent: true })
+    throw new Error('Нужно разрешить доступ к Google Диску')
+  }
+  sessionStorage.removeItem(CONSENT_KEY)
+
   const expiresIn = Number(params.get('expires_in') || '3600')
   enableAuthSession()
   saveToken(token, Number.isFinite(expiresIn) ? expiresIn : 3600)
@@ -257,12 +279,13 @@ export function consumeGoogleRedirect(): Promise<GoogleProfile | null> {
   return consumePromise
 }
 
-export function startGoogleSignIn() {
+export function startGoogleSignIn(options?: { consent?: boolean }) {
   const clientId = getGoogleClientId()
   if (!clientId) throw new Error('Не задан VITE_GOOGLE_CLIENT_ID')
   enableAuthSession()
   const state = crypto.randomUUID()
   sessionStorage.setItem(STATE_KEY, state)
+  if (options?.consent) sessionStorage.setItem(CONSENT_KEY, '1')
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: oauthRedirectUri(),
@@ -270,7 +293,7 @@ export function startGoogleSignIn() {
     scope: SCOPES,
     include_granted_scopes: 'true',
     state,
-    prompt: 'select_account',
+    prompt: options?.consent ? 'consent' : 'select_account',
   })
   window.location.assign(
     `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
@@ -286,7 +309,7 @@ export async function ensureAccessToken(interactive = false): Promise<string> {
     return await requestToken(interactive ? 'consent' : '')
   } catch (error) {
     if (!interactive || !authEnabled) throw error
-    startGoogleSignIn()
+    startGoogleSignIn({ consent: true })
     throw new Error('Нужно снова войти через Google')
   }
 }
@@ -314,6 +337,24 @@ export function enableAuthSession() {
   authEnabled = true
 }
 
+async function needsDriveReauth(response: Response) {
+  if (response.status === 401) return true
+  if (response.status !== 403) return false
+  try {
+    const body = (await response.clone().json()) as {
+      error?: { status?: string; details?: { reason?: string }[] }
+    }
+    return (
+      body.error?.status === 'PERMISSION_DENIED' ||
+      body.error?.details?.some(
+        (item) => item.reason === 'ACCESS_TOKEN_SCOPE_INSUFFICIENT',
+      ) === true
+    )
+  } catch {
+    return false
+  }
+}
+
 export async function authorizedFetch(
   input: string,
   init: RequestInit = {},
@@ -322,7 +363,7 @@ export async function authorizedFetch(
   const headers = new Headers(init.headers)
   headers.set('Authorization', `Bearer ${token}`)
   let response = await fetch(input, { ...init, headers })
-  if (response.status === 401) {
+  if (await needsDriveReauth(response)) {
     accessToken = null
     localStorage.removeItem(TOKEN_KEY)
     const next = await ensureAccessToken(true)

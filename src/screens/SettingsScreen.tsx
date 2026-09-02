@@ -438,7 +438,7 @@ export function SettingsScreen() {
       <Dialog
         open={logoutOpen}
         title="Выйти?"
-        description="Данные на этом устройстве останутся. Чтобы снова писать на Диск, войдите."
+        description="Дети останутся на этом устройстве для того же Google-аккаунта. Если войдёте другим — подтянутся его данные с Диска."
         confirmLabel="Выйти"
         onClose={() => setLogoutOpen(false)}
         onConfirm={() => {

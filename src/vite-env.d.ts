@@ -14,6 +14,7 @@ interface GoogleTokenResponse {
   error?: string
   error_description?: string
   expires_in?: number
+  scope?: string
 }
 
 interface GoogleTokenClient {
