@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  --color-cream: #f7f3ec;
+  --color-cream-2: #efe8dc;
+  --color-surface: #fffdf8;
+  --color-sage: #5b8f7a;
+  --color-sage-hover: #4e7c69;
+  --color-sage-soft: #dce8e2;
+  --color-terracotta: #c45c26;
+  --color-terracotta-soft: #f3e0d4;
+  --color-ink: #2c2a26;
+  --color-muted: #7a756c;
+  --color-line: #e4dcd0;
+  --color-danger: #c23b2e;
+  --color-warning: #c9891a;
+  --color-charcoal: #1c1b19;
+  --color-charcoal-2: #262421;
+  --color-dark-line: #3a3732;
+  --color-dark-text: #f3eee6;
+  --color-dark-muted: #b8b0a4;
+}
+
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@utility pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+@utility px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+html {
+  color-scheme: light;
+  min-height: 100dvh;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  background: var(--color-cream);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+html.dark body {
+  background: var(--color-charcoal);
+  color: var(--color-dark-text);
+}
+
+#root {
+  max-width: 32rem;
+  margin: 0 auto;
+  min-height: 100dvh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: var(--color-sage-soft);
+}
