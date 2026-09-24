@@ -229,60 +229,64 @@ export function CategoryScreen() {
               <div
                 key={product.id}
                 className={cn(
-                  'flex items-center gap-3 rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
+                  'rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
                   product.favorite && 'ring-2 ring-danger/40',
                 )}
               >
-                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
-                  {product.image ? (
-                    <img
-                      src={product.image}
-                      alt=""
-                      className="size-full object-cover"
+                <div className="mb-2 flex items-start gap-1.5">
+                  <p className="min-w-0 flex-1 break-words font-extrabold leading-snug">
+                    {product.name}
+                  </p>
+                  {product.favorite ? (
+                    <Heart
+                      size={16}
+                      className="mt-0.5 shrink-0 text-danger"
+                      fill="currentColor"
+                      aria-label="В любимых"
                     />
-                  ) : (
-                    <Package size={20} />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-1">
-                    <p className="min-w-0 truncate font-extrabold">{product.name}</p>
-                    {product.favorite ? (
-                      <Heart
-                        size={16}
-                        className="shrink-0 text-danger"
-                        fill="currentColor"
-                        aria-label="В любимых"
-                      />
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-muted">
-                    {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
-                    {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
-                  </p>
-                  <p
-                    className={cn(
-                      'mt-0.5 text-xs font-bold',
-                      canTake > 0 ? 'text-sage' : 'text-muted',
-                    )}
-                  >
-                    {canTake > 0
-                      ? `можно ещё ${canTake} шт`
-                      : 'больше не влезет'}
-                  </p>
+                  ) : null}
                 </div>
-                <NumberStepper
-                  value={qtyOf(product.id)}
-                  onChange={(value) => setQuantity(product.id, value)}
-                />
-                <button
-                  type="button"
-                  aria-label="Ещё"
-                  className="flex size-10 items-center justify-center rounded-full text-muted"
-                  onClick={() => setMenuId(product.id)}
-                >
-                  <MoreVertical size={18} />
-                </button>
+                <div className="flex items-center gap-3">
+                  <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <Package size={20} />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted">
+                      {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
+                      {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
+                    </p>
+                    <p
+                      className={cn(
+                        'mt-0.5 text-xs font-bold',
+                        canTake > 0 ? 'text-sage' : 'text-muted',
+                      )}
+                    >
+                      {canTake > 0
+                        ? `можно ещё ${canTake} шт`
+                        : 'больше не влезет'}
+                    </p>
+                  </div>
+                  <NumberStepper
+                    value={qtyOf(product.id)}
+                    onChange={(value) => setQuantity(product.id, value)}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Ещё"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted"
+                    onClick={() => setMenuId(product.id)}
+                  >
+                    <MoreVertical size={18} />
+                  </button>
+                </div>
               </div>
             )
           })
@@ -366,54 +370,58 @@ export function CategoryScreen() {
                   <div
                     key={product.id}
                     className={cn(
-                      'flex items-center gap-3 rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
+                      'rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
                       product.favorite && 'ring-2 ring-danger/40',
                     )}
                   >
-                    <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
-                      {product.image ? (
-                        <img src={product.image} alt="" className="size-full object-cover" />
-                      ) : (
-                        <Package size={20} />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-1">
-                        <p className="min-w-0 truncate font-extrabold">{product.name}</p>
-                        {product.favorite ? (
-                          <Heart
-                            size={16}
-                            className="shrink-0 text-danger"
-                            fill="currentColor"
-                            aria-label="В любимых"
-                          />
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted">
-                        {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
-                        {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
+                    <div className="mb-2 flex items-start gap-1.5">
+                      <p className="min-w-0 flex-1 break-words font-extrabold leading-snug">
+                        {product.name}
                       </p>
-                      <p
-                        className={cn(
-                          'mt-0.5 text-xs font-bold',
-                          canTake > 0 ? 'text-sage' : 'text-muted',
-                        )}
-                      >
-                        {canTake > 0 ? `можно ещё ${canTake} шт` : 'больше не влезет'}
-                      </p>
+                      {product.favorite ? (
+                        <Heart
+                          size={16}
+                          className="mt-0.5 shrink-0 text-danger"
+                          fill="currentColor"
+                          aria-label="В любимых"
+                        />
+                      ) : null}
                     </div>
-                    <NumberStepper
-                      value={qtyOf(product.id)}
-                      onChange={(value) => setQuantity(product.id, value)}
-                    />
-                    <button
-                      type="button"
-                      aria-label="Ещё"
-                      className="flex size-10 items-center justify-center rounded-full text-muted"
-                      onClick={() => setMenuId(product.id)}
-                    >
-                      <MoreVertical size={18} />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
+                        {product.image ? (
+                          <img src={product.image} alt="" className="size-full object-cover" />
+                        ) : (
+                          <Package size={20} />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted">
+                          {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
+                          {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
+                        </p>
+                        <p
+                          className={cn(
+                            'mt-0.5 text-xs font-bold',
+                            canTake > 0 ? 'text-sage' : 'text-muted',
+                          )}
+                        >
+                          {canTake > 0 ? `можно ещё ${canTake} шт` : 'больше не влезет'}
+                        </p>
+                      </div>
+                      <NumberStepper
+                        value={qtyOf(product.id)}
+                        onChange={(value) => setQuantity(product.id, value)}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Ещё"
+                        className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted"
+                        onClick={() => setMenuId(product.id)}
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                    </div>
                   </div>
                 )
               })

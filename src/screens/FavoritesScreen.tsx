@@ -122,40 +122,44 @@ export function FavoritesScreen() {
                     return (
                       <div
                         key={product.id}
-                        className="flex items-center gap-3 rounded-2xl bg-surface px-3 py-3 ring-2 ring-danger/40 dark:bg-charcoal-2"
+                        className="rounded-2xl bg-surface px-3 py-3 ring-2 ring-danger/40 dark:bg-charcoal-2"
                       >
-                        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
-                          {product.image ? (
-                            <img
-                              src={product.image}
-                              alt=""
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <Package size={20} />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-extrabold">{product.name}</p>
-                          <p className="text-xs text-muted">
-                            {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
-                            {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
-                          </p>
-                          {balance ? (
-                            <p
-                              className={cn(
-                                'mt-0.5 text-xs font-bold',
-                                canTake > 0 ? 'text-sage' : 'text-muted',
-                              )}
-                            >
-                              {canTake > 0 ? `можно ещё ${canTake} шт` : 'больше не влезет'}
+                        <p className="mb-2 break-words font-extrabold leading-snug">
+                          {product.name}
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
+                            {product.image ? (
+                              <img
+                                src={product.image}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              <Package size={20} />
+                            )}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs text-muted">
+                              {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
+                              {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
                             </p>
-                          ) : null}
+                            {balance ? (
+                              <p
+                                className={cn(
+                                  'mt-0.5 text-xs font-bold',
+                                  canTake > 0 ? 'text-sage' : 'text-muted',
+                                )}
+                              >
+                                {canTake > 0 ? `можно ещё ${canTake} шт` : 'больше не влезет'}
+                              </p>
+                            ) : null}
+                          </div>
+                          <NumberStepper
+                            value={qtyOf(product.id)}
+                            onChange={(value) => setQuantity(product.id, value)}
+                          />
                         </div>
-                        <NumberStepper
-                          value={qtyOf(product.id)}
-                          onChange={(value) => setQuantity(product.id, value)}
-                        />
                       </div>
                     )
                   })}
