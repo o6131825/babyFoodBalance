@@ -60,6 +60,7 @@ type ProductInput = {
   categoryId: string
   name: string
   unitSize: number
+  packSize?: number
   qty?: number
   image?: string
   favorite?: boolean
@@ -401,11 +402,16 @@ export const useAppStore = create<AppStore>((set, get) => {
       commit((state) => {
         const id = input.id ?? uid()
         const previous = state.products.find((item) => item.id === id)
+        const packSize =
+          input.packSize != null && input.packSize >= 2
+            ? Math.round(input.packSize)
+            : undefined
         const product = {
           id,
           categoryId: input.categoryId,
           name: input.name.trim(),
           unitSize: input.unitSize,
+          ...(packSize ? { packSize } : {}),
           image: input.image,
           ...(input.favorite
             ? {

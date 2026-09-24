@@ -1,10 +1,12 @@
 import { ArrowUpDown, ChevronLeft, Heart, MoreVertical, Package, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import type { Product, Unit } from '@/data/types'
 import {
   categoryBalance,
   formatAmount,
   limitWarning,
+  packsCanFit,
   unitsCanFit,
 } from '@/features/calculator'
 import { useAppStore } from '@/features/store/appStore'
@@ -21,12 +23,15 @@ type ProductDraft = {
   id?: string
   name: string
   unitSize: string
+  packSize: string
   qty: string
   image?: string
   favorite?: boolean
 }
 
-const emptyDraft: ProductDraft = { name: '', unitSize: '', qty: '' }
+type CountMode = 'pieces' | 'packs'
+
+const emptyDraft: ProductDraft = { name: '', unitSize: '', packSize: '', qty: '' }
 
 export function CategoryScreen() {
   const { id } = useParams()
@@ -87,6 +92,7 @@ export function CategoryScreen() {
     products.length !== rankedIds.length ||
     products.some((item, index) => item.id !== rankedIds[index])
 
+  const [countMode, setCountMode] = useState<CountMode>('pieces')
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [queryCategoryId, setQueryCategoryId] = useState(id)
@@ -141,12 +147,17 @@ export function CategoryScreen() {
     if (!draft || !id) return
     const unitSize = Number(draft.unitSize)
     const qty = draft.qty === '' ? undefined : Number(draft.qty)
+    const packRaw = draft.packSize === '' ? undefined : Number(draft.packSize)
     if (!draft.name.trim() || !Number.isFinite(unitSize) || unitSize <= 0) return
     saveProduct({
       id: draft.id,
       categoryId: id,
       name: draft.name,
       unitSize,
+      packSize:
+        packRaw != null && Number.isFinite(packRaw) && packRaw >= 2
+          ? Math.round(packRaw)
+          : undefined,
       qty: qty != null && Number.isFinite(qty) ? qty : undefined,
       image: draft.image,
       favorite: draft.favorite,
@@ -174,6 +185,34 @@ export function CategoryScreen() {
               {formatAmount(balance.used, category.unit)} занято из{' '}
               {formatAmount(balance.limit, category.unit)}
             </p>
+          </div>
+          <div
+            role="group"
+            aria-label="Как считать количество"
+            className="flex h-11 shrink-0 rounded-full bg-surface p-1 dark:bg-charcoal-2"
+          >
+            <button
+              type="button"
+              aria-pressed={countMode === 'pieces'}
+              className={cn(
+                'rounded-full px-2.5 text-sm font-bold',
+                countMode === 'pieces' ? 'bg-sage text-white' : 'text-muted',
+              )}
+              onClick={() => setCountMode('pieces')}
+            >
+              шт
+            </button>
+            <button
+              type="button"
+              aria-pressed={countMode === 'packs'}
+              className={cn(
+                'rounded-full px-2.5 text-sm font-bold',
+                countMode === 'packs' ? 'bg-sage text-white' : 'text-muted',
+              )}
+              onClick={() => setCountMode('packs')}
+            >
+              уп
+            </button>
           </div>
           <button
             type="button"
@@ -223,73 +262,18 @@ export function CategoryScreen() {
             Добавьте первый товар в эту категорию
           </p>
         ) : (
-          products.map((product) => {
-            const canTake = unitsCanFit(balance.remaining, product.unitSize)
-            return (
-              <div
-                key={product.id}
-                className={cn(
-                  'rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
-                  product.favorite && 'ring-2 ring-danger/40',
-                )}
-              >
-                <div className="mb-2 flex items-start gap-1.5">
-                  <p className="min-w-0 flex-1 break-words font-extrabold leading-snug">
-                    {product.name}
-                  </p>
-                  {product.favorite ? (
-                    <Heart
-                      size={16}
-                      className="mt-0.5 shrink-0 text-danger"
-                      fill="currentColor"
-                      aria-label="В любимых"
-                    />
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
-                    {product.image ? (
-                      <img
-                        src={product.image}
-                        alt=""
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <Package size={20} />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs text-muted">
-                      {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
-                      {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
-                    </p>
-                    <p
-                      className={cn(
-                        'mt-0.5 text-xs font-bold',
-                        canTake > 0 ? 'text-sage' : 'text-muted',
-                      )}
-                    >
-                      {canTake > 0
-                        ? `можно ещё ${canTake} шт`
-                        : 'больше не влезет'}
-                    </p>
-                  </div>
-                  <NumberStepper
-                    value={qtyOf(product.id)}
-                    onChange={(value) => setQuantity(product.id, value)}
-                  />
-                  <button
-                    type="button"
-                    aria-label="Ещё"
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted"
-                    onClick={() => setMenuId(product.id)}
-                  >
-                    <MoreVertical size={18} />
-                  </button>
-                </div>
-              </div>
-            )
-          })
+          products.map((product) => (
+            <ProductRow
+              key={product.id}
+              product={product}
+              unit={category.unit}
+              qty={qtyOf(product.id)}
+              remaining={balance.remaining}
+              countMode={countMode}
+              onQuantity={(value) => setQuantity(product.id, value)}
+              onMenu={() => setMenuId(product.id)}
+            />
+          ))
         )}
       </div>
 
@@ -364,67 +348,18 @@ export function CategoryScreen() {
                 Ничего не нашлось по запросу «{searchQuery.trim()}»
               </p>
             ) : (
-              visibleProducts.map((product) => {
-                const canTake = unitsCanFit(balance.remaining, product.unitSize)
-                return (
-                  <div
-                    key={product.id}
-                    className={cn(
-                      'rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
-                      product.favorite && 'ring-2 ring-danger/40',
-                    )}
-                  >
-                    <div className="mb-2 flex items-start gap-1.5">
-                      <p className="min-w-0 flex-1 break-words font-extrabold leading-snug">
-                        {product.name}
-                      </p>
-                      {product.favorite ? (
-                        <Heart
-                          size={16}
-                          className="mt-0.5 shrink-0 text-danger"
-                          fill="currentColor"
-                          aria-label="В любимых"
-                        />
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
-                        {product.image ? (
-                          <img src={product.image} alt="" className="size-full object-cover" />
-                        ) : (
-                          <Package size={20} />
-                        )}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-muted">
-                          {formatAmount(product.unitSize, category.unit)} × {qtyOf(product.id)} ={' '}
-                          {formatAmount(product.unitSize * qtyOf(product.id), category.unit)}
-                        </p>
-                        <p
-                          className={cn(
-                            'mt-0.5 text-xs font-bold',
-                            canTake > 0 ? 'text-sage' : 'text-muted',
-                          )}
-                        >
-                          {canTake > 0 ? `можно ещё ${canTake} шт` : 'больше не влезет'}
-                        </p>
-                      </div>
-                      <NumberStepper
-                        value={qtyOf(product.id)}
-                        onChange={(value) => setQuantity(product.id, value)}
-                      />
-                      <button
-                        type="button"
-                        aria-label="Ещё"
-                        className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted"
-                        onClick={() => setMenuId(product.id)}
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })
+              visibleProducts.map((product) => (
+                <ProductRow
+                  key={product.id}
+                  product={product}
+                  unit={category.unit}
+                  qty={qtyOf(product.id)}
+                  remaining={balance.remaining}
+                  countMode={countMode}
+                  onQuantity={(value) => setQuantity(product.id, value)}
+                  onMenu={() => setMenuId(product.id)}
+                />
+              ))
             )}
           </div>
         </div>
@@ -461,6 +396,17 @@ export function CategoryScreen() {
               value={draft.unitSize}
               onChange={(e) =>
                 setDraft({ ...draft, unitSize: e.target.value.replace(/\D/g, '') })
+              }
+            />
+            <Field
+              label="Штук в упаковке"
+              hint="Необязательно. От 2 — товар можно набирать целыми упаковками."
+              inputMode="numeric"
+              placeholder="6"
+              suffix="шт"
+              value={draft.packSize}
+              onChange={(e) =>
+                setDraft({ ...draft, packSize: e.target.value.replace(/\D/g, '') })
               }
             />
             <Field
@@ -505,6 +451,7 @@ export function CategoryScreen() {
                 id: product.id,
                 name: product.name,
                 unitSize: String(product.unitSize),
+                packSize: product.packSize ? String(product.packSize) : '',
                 qty: String(qtyOf(product.id)),
                 image: product.image,
                 favorite: product.favorite,
@@ -541,4 +488,134 @@ export function CategoryScreen() {
       />
     </div>
   )
+}
+
+function ProductRow({
+  product,
+  unit,
+  qty,
+  remaining,
+  countMode,
+  onQuantity,
+  onMenu,
+}: {
+  product: Product
+  unit: Unit
+  qty: number
+  remaining: number
+  countMode: CountMode
+  onQuantity: (qty: number) => void
+  onMenu: () => void
+}) {
+  const pack = product.packSize
+  const inPacks = countMode === 'packs' && pack != null && pack >= 2
+  const piecesFit = unitsCanFit(remaining, product.unitSize)
+  const packsFit = inPacks && pack ? packsCanFit(remaining, product.unitSize, pack) : 0
+  const shown = inPacks && pack ? Math.floor(qty / pack) : qty
+  const loose = inPacks && pack ? qty % pack : 0
+  const fitPositive = inPacks ? packsFit > 0 || piecesFit > 0 : piecesFit > 0
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl bg-surface px-3 py-3 dark:bg-charcoal-2',
+        product.favorite && 'ring-2 ring-danger/40',
+      )}
+    >
+      <div className="mb-2 flex items-start gap-1.5">
+        <p className="min-w-0 flex-1 break-words font-extrabold leading-snug">
+          {product.name}
+        </p>
+        {product.favorite ? (
+          <Heart
+            size={16}
+            className="mt-0.5 shrink-0 text-danger"
+            fill="currentColor"
+            aria-label="В любимых"
+          />
+        ) : null}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-cream-2 text-muted dark:bg-charcoal">
+          {product.image ? (
+            <img src={product.image} alt="" className="size-full object-cover" />
+          ) : (
+            <Package size={20} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted">
+            {amountLine(product.unitSize, unit, qty, pack, inPacks, shown, loose)}
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 text-xs font-bold',
+              fitPositive ? 'text-sage' : 'text-muted',
+            )}
+          >
+            {fitLabel(countMode, inPacks, piecesFit, packsFit)}
+          </p>
+        </div>
+        <div className="flex flex-col items-center">
+          <NumberStepper
+            value={shown}
+            label={inPacks ? 'Упаковки' : 'Количество'}
+            onChange={(value) => {
+              if (inPacks && pack) onQuantity(value * pack + loose)
+              else onQuantity(value)
+            }}
+          />
+          {inPacks ? (
+            <span className="text-[10px] font-bold leading-none text-sage">уп.</span>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          aria-label="Ещё"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-muted"
+          onClick={onMenu}
+        >
+          <MoreVertical size={18} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function amountLine(
+  unitSize: number,
+  unit: Unit,
+  qty: number,
+  pack: number | undefined,
+  inPacks: boolean,
+  shownPacks: number,
+  loose: number,
+): string {
+  const base = `${formatAmount(unitSize, unit)} × ${qty} = ${formatAmount(unitSize * qty, unit)}`
+  if (pack == null || pack < 2) return base
+  if (inPacks && loose > 0) return `${base} · ${shownPacks} уп. + ${loose} шт`
+  return `${base} · по ${pack} шт`
+}
+
+function fitLabel(
+  countMode: CountMode,
+  inPacks: boolean,
+  piecesFit: number,
+  packsFit: number,
+): string {
+  if (!inPacks) {
+    const base = piecesFit > 0 ? `можно ещё ${piecesFit} шт` : 'больше не влезет'
+    return countMode === 'packs' ? `${base} · нет упаковки` : base
+  }
+  if (packsFit > 0) return `можно ещё ${packsFit} ${packWord(packsFit)}`
+  if (piecesFit > 0) return `упаковка не влезет · ещё ${piecesFit} шт`
+  return 'больше не влезет'
+}
+
+function packWord(count: number): string {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return 'упаковку'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'упаковки'
+  return 'упаковок'
 }

@@ -19,6 +19,8 @@ export type Product = {
   categoryId: string
   name: string
   unitSize: number
+  /** Штук в одной упаковке. Нет поля — товар считается только поштучно. */
+  packSize?: number
   image?: string
   favorite?: boolean
   favoritedAt?: string

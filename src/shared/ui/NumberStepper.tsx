@@ -5,9 +5,10 @@ type Props = {
   value: number
   onChange: (value: number) => void
   min?: number
+  label?: string
 }
 
-export function NumberStepper({ value, onChange, min = 0 }: Props) {
+export function NumberStepper({ value, onChange, min = 0, label = 'Количество' }: Props) {
   return (
     <div className="flex items-center gap-1">
       <button
@@ -23,7 +24,7 @@ export function NumberStepper({ value, onChange, min = 0 }: Props) {
       </button>
       <input
         inputMode="numeric"
-        aria-label="Количество"
+        aria-label={label}
         className="h-11 w-14 rounded-xl border border-line bg-surface text-center text-lg font-bold text-ink outline-none focus:border-sage dark:border-dark-line dark:bg-charcoal-2 dark:text-dark-text"
         value={value}
         onChange={(event) => {

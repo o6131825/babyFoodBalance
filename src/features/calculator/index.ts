@@ -50,6 +50,16 @@ export function unitsCanFit(remaining: number, unitSize: number): number {
   return Math.floor(remaining / unitSize)
 }
 
+/** Сколько целых упаковок ещё влезает в остаток лимита. */
+export function packsCanFit(
+  remaining: number,
+  unitSize: number,
+  packSize: number,
+): number {
+  if (packSize < 2) return 0
+  return Math.floor(unitsCanFit(remaining, unitSize) / packSize)
+}
+
 export function formatAmount(value: number, unit: Unit): string {
   const rounded = Math.round(value)
   const suffix = unit === 'ml' ? 'мл' : 'г'
