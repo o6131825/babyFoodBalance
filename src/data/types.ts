@@ -20,6 +20,8 @@ export type Product = {
   name: string
   unitSize: number
   image?: string
+  favorite?: boolean
+  favoritedAt?: string
 }
 
 export type CategoryLimit = {

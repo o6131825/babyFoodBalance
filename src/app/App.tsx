@@ -5,6 +5,7 @@ import { useAppStore } from '@/features/store/appStore'
 import { CategoryFormScreen } from '@/screens/CategoryFormScreen'
 import { CategoryScreen } from '@/screens/CategoryScreen'
 import { DashboardScreen } from '@/screens/DashboardScreen'
+import { FavoritesScreen } from '@/screens/FavoritesScreen'
 import { LoginScreen } from '@/screens/LoginScreen'
 import { OnboardingScreen } from '@/screens/OnboardingScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/onboarding" element={<OnboardingScreen />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardScreen />} />
+            <Route path="/favorites" element={<FavoritesScreen />} />
             <Route path="/category/:id" element={<CategoryScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route

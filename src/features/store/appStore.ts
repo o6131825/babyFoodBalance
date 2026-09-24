@@ -62,6 +62,7 @@ type ProductInput = {
   unitSize: number
   qty?: number
   image?: string
+  favorite?: boolean
 }
 
 type AppStore = {
@@ -399,12 +400,22 @@ export const useAppStore = create<AppStore>((set, get) => {
     saveProduct: (input) => {
       commit((state) => {
         const id = input.id ?? uid()
+        const previous = state.products.find((item) => item.id === id)
         const product = {
           id,
           categoryId: input.categoryId,
           name: input.name.trim(),
           unitSize: input.unitSize,
           image: input.image,
+          ...(input.favorite
+            ? {
+                favorite: true,
+                favoritedAt:
+                  previous?.favorite && previous.favoritedAt
+                    ? previous.favoritedAt
+                    : new Date().toISOString(),
+              }
+            : {}),
         }
         const existing = state.products.some((item) => item.id === id)
         const products = existing

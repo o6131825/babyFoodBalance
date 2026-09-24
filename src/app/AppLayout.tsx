@@ -1,11 +1,12 @@
-import { Home, Settings } from 'lucide-react'
+import { Heart, Home, Settings } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
 
+const NAV_PATHS = new Set(['/', '/favorites', '/settings'])
+
 export function AppLayout() {
   const location = useLocation()
-  const showNav =
-    location.pathname === '/' || location.pathname === '/settings'
+  const showNav = NAV_PATHS.has(location.pathname)
 
   return (
     <div className="flex min-h-dvh flex-col bg-cream dark:bg-charcoal">
@@ -14,8 +15,9 @@ export function AppLayout() {
       </div>
       {showNav ? (
         <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-lg border-t border-line/80 bg-cream/90 px-safe pb-safe backdrop-blur-md dark:border-dark-line dark:bg-charcoal/90">
-          <div className="grid grid-cols-2 py-2">
+          <div className="grid grid-cols-3 py-2">
             <Tab to="/" icon={Home} label="Главная" />
+            <Tab to="/favorites" icon={Heart} label="Любимые" />
             <Tab to="/settings" icon={Settings} label="Настройки" />
           </div>
         </nav>
